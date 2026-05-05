@@ -1,4 +1,11 @@
 services:
+  # PostgreSQL Database
+  - type: pserv
+    name: alshatibi-postgres
+    ipAllowList: []
+    plan: free
+    postgresSQLVersion: '16'
+
   # Backend Service
   - type: web
     name: alshatibi-backend
@@ -15,11 +22,38 @@ services:
         value: 10000
       - key: JWT_SECRET
         generateValue: true
+      - key: DB_HOST
+        fromService:
+          type: pserv
+          name: alshatibi-postgres
+          property: host
+      - key: DB_PORT
+        fromService:
+          type: pserv
+          name: alshatibi-postgres
+          property: port
+      - key: DB_USER
+        fromService:
+          type: pserv
+          name: alshatibi-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromService:
+          type: pserv
+          name: alshatibi-postgres
+          property: password
+      - key: DB_NAME
+        fromService:
+          type: pserv
+          name: alshatibi-postgres
+          property: database
     healthCheckPath: /api/health
     disk:
       name: uploads
       mountPath: /opt/render/project/backend/uploads
       sizeGB: 1
+    dependsOn:
+      - alshatibi-postgres
 
   # Frontend Service
   - type: web
