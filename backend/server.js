@@ -34,6 +34,11 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/driver', driverRoutes);
 
+// Health check endpoint for Render
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date() });
+});
+
 const io = initSocket(httpServer);
 app.set('io', io);
 app.use('/api/orders', orderRoutes(io));
