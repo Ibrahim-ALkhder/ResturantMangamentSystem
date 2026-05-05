@@ -284,5 +284,40 @@ const Navbar = () => {
     </>
   );
 };
+{/* روابط تظهر في قائمة المستخدم لكل دور */}
+const getUserMenuLinks = () => {
+  if (isAdmin) {
+    return [
+      { to: '/dashboard', label: 'الإحصائيات والتقارير' },
+      { to: '/staff/orders', label: 'لوحة متابعة الطلبات' },
+      { to: '/menu-management', label: 'إدارة القائمة' },
+      { to: '/users', label: 'إدارة المستخدمين' },
+    ];
+  }
+  if (isStaff) {
+    return [
+      { to: '/staff/orders', label: 'لوحة متابعة الطلبات' },
+      { to: '/menu-management', label: 'إدارة القائمة' }, // ✅ يجب أن يكون موجوداً
+    ];
+  }
+  return [];
+};
+const getAdminQuickLinks = () => {
+  if (isAdmin) {
+    return [
+      { to: '/dashboard', label: '📊 الإحصائيات' },
+      { to: '/staff/orders', label: '📋 الطلبات' },
+      { to: '/menu-management', label: '🍽️ القائمة' },
+      { to: '/users', label: '👥 المستخدمين' },
+    ];
+  }
+  if (isStaff) {
+    return [
+      { to: '/staff/orders', label: '📋 الطلبات' },
+      { to: '/menu-management', label: '🍽️ القائمة' }, // ✅ يجب أن يكون موجوداً
+    ];
+  }
+  return [];
+};
 
 export default Navbar;
