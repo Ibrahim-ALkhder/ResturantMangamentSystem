@@ -9,7 +9,7 @@ const sequelize = isProduction
       dialectOptions: {
         ssl: {
           require: true,
-          rejectUnauthorized: false, // مهم جداً لـ Render
+          rejectUnauthorized: false,
         },
       },
       pool: {
