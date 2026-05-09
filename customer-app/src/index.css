@@ -160,6 +160,7 @@ button, a { transition: var(--transition); }
   .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(249,115,22,0.4); }
   .btn-secondary { background: #fff; border: 1px solid #e5e7eb; }
 
+  
   /* ----- تحويل الجداول إلى كروت (بدون تمرير أفقي) ----- */
   table { white-space: normal; }
   thead { display: none; }
@@ -239,4 +240,39 @@ table button {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+/* إصلاح تنسيق صف السلة على الجوال */
+@media (max-width: 640px) {
+  .cart-item-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  .cart-item-row > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  .cart-item-row img {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+  .cart-item-row > div:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.5rem;
+  }
+  .cart-item-row button:last-child {
+    margin-left: auto;
+    background-color: #fee2e2;
+    border-radius: 50%;
+    padding: 0.35rem;
+  }
 }
