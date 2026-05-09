@@ -24,6 +24,7 @@ const httpServer = createServer(app);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// التأكد من وضع الإنتاج
 const isProduction = process.env.NODE_ENV === 'production';
 
 // 1. إعدادات CORS
@@ -56,7 +57,11 @@ app.use('/api/driver', driverRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'OK', environment: process.env.NODE_ENV });
+  res.status(200).json({ 
+    status: 'OK', 
+    environment: process.env.NODE_ENV,
+    database: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'
+  });
 });
 
 // 4. Socket.io
@@ -71,24 +76,34 @@ const PORT = process.env.PORT || 5000;
 // 5. تشغيل السيرفر والمزامنة الآمنة لقاعدة البيانات
 const startServer = async () => {
   try {
+    // محاولة الاتصال
     await sequelize.authenticate();
-    console.log(`📦 Connected to ${isProduction ? 'PostgreSQL' : 'SQLite'}`);
-
-    // الحل الجذري لمشكلة مسح البيانات:
-    // force: false تمنع حذف الجداول (DROP TABLE)
-    // alter: false في الإنتاج تمنع التعديلات العشوائية التي قد تمسح الطلبات
-    await sequelize.sync({ 
-      force: false, 
-      alter: !isProduction 
-    });
     
-    console.log('✅ Database synchronized safely. No data loss risk.');
+    // طباعة نوع القاعدة المتصل بها في الـ Logs لضمان الشفافية
+    const dbSource = process.env.DATABASE_URL ? 'PostgreSQL (Render)' : 'SQLite (Local File)';
+    console.log(`📦 Database Source: ${dbSource}`);
+
+    /**
+     * الحل النهائي لمشكلة مسح البيانات:
+     * في الـ Production نمنع Sequelize تماماً من لمس هيكل الجداول.
+     * force: false -> لا تحذف الجداول أبداً.
+     * alter: false -> لا تعدل الأعمدة تلقائياً (يحمي من مسح البيانات عند حدوث تعارض).
+     */
+    const syncOptions = isProduction 
+      ? { force: false, alter: false } 
+      : { force: false, alter: true };
+
+    await sequelize.sync(syncOptions);
+    
+    console.log('✅ Database connected and synchronized safely.');
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (err) {
     console.error('❌ DB connection error:', err);
+    // إذا فشل الاتصال بقاعدة البيانات الخارجية، لا نريد تشغيل السيرفر ببيانات محلية مؤقتة
     process.exit(1);
   }
 };
