@@ -5,7 +5,12 @@ import User from '../models/User.js';
 export const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+      origin: [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'https://alshatibi-web.onrender.com',
+        'https://alshatibi-customer.onrender.com',
+      ],
       credentials: true,
     },
   });
