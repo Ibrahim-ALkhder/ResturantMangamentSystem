@@ -5,16 +5,6 @@ import { createServer } from 'http';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import sequelize from './config/database.js';
-import './models/index.js'; 
-import authRoutes from './routes/authRoutes.js';
-import categoryRoutes from './routes/categoryRoutes.js';
-import menuRoutes from './routes/menuRoutes.js';
-import orderRoutes from './routes/orderRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import driverRoutes from './routes/driverRoutes.js';
-import { errorHandler } from './middleware/errorMiddleware.js';
-import { initSocket } from './socket/index.js';
 
 dotenv.config();
 
@@ -24,13 +14,10 @@ const httpServer = createServer(app);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// التأكد من وضع الإنتاج
-const isProduction = process.env.NODE_ENV === 'production';
-
-// 1. إعدادات CORS
 app.use(cors({
   origin: [
-    'https://alshatibi-customer.onrender.com', 
+    'https://alshatibi-customer.onrender.com',
+    'https://alshatibi-web.onrender.com',
     'http://localhost:5173'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -41,71 +28,79 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 2. مجلد الرفع
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-app.use('/uploads', express.static(uploadDir));
+let dbError = null;
+let modulesLoaded = false;
 
-// 3. المسارات
-app.use('/api/auth', authRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/menu', menuRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/driver', driverRoutes);
-
-// Health check
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    environment: process.env.NODE_ENV,
-    database: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'
-  });
+  res.status(200).json({ status: 'OK', dbError, modulesLoaded });
 });
 
-// 4. Socket.io
-const io = initSocket(httpServer);
-app.set('io', io);
-app.use('/api/orders', orderRoutes(io));
-
-app.use(errorHandler);
-
 const PORT = process.env.PORT || 5000;
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server started on port ${PORT}`);
+});
 
-// 5. تشغيل السيرفر والمزامنة الآمنة لقاعدة البيانات
-const startServer = async () => {
+process.on('uncaughtException', (err) => console.error('[FATAL]', err));
+process.on('unhandledRejection', (reason) => console.error('[FATAL]', reason));
+
+setTimeout(async () => {
   try {
-    // محاولة الاتصال
-    await sequelize.authenticate();
-    
-    // طباعة نوع القاعدة المتصل بها في الـ Logs لضمان الشفافية
-    const dbSource = process.env.DATABASE_URL ? 'PostgreSQL (Render)' : 'SQLite (Local File)';
-    console.log(`📦 Database Source: ${dbSource}`);
+    const sequelize = (await import('./config/database.js')).default;
+    await import('./models/index.js');
+    const authRoutes = (await import('./routes/authRoutes.js')).default;
+    const categoryRoutes = (await import('./routes/categoryRoutes.js')).default;
+    const menuRoutes = (await import('./routes/menuRoutes.js')).default;
+    const userRoutes = (await import('./routes/userRoutes.js')).default;
+    const driverRoutes = (await import('./routes/driverRoutes.js')).default;
+    const orderRoutes = (await import('./routes/orderRoutes.js')).default;
+    const { errorHandler } = await import('./middleware/errorMiddleware.js');
+    const { initSocket } = await import('./socket/index.js');
 
-    /**
-     * الحل النهائي لمشكلة مسح البيانات:
-     * في الـ Production نمنع Sequelize تماماً من لمس هيكل الجداول.
-     * force: false -> لا تحذف الجداول أبداً.
-     * alter: false -> لا تعدل الأعمدة تلقائياً (يحمي من مسح البيانات عند حدوث تعارض).
-     */
-    const syncOptions = isProduction 
-      ? { force: false, alter: false } 
-      : { force: false, alter: true };
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    app.use('/uploads', express.static(uploadDir));
 
-    await sequelize.sync(syncOptions);
-    
-    console.log('✅ Database connected and synchronized safely.');
+    app.use('/api/auth', authRoutes);
+    app.use('/api/categories', categoryRoutes);
+    app.use('/api/menu', menuRoutes);
+    app.use('/api/users', userRoutes);
+    app.use('/api/driver', driverRoutes);
 
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
+    const io = initSocket(httpServer);
+    app.set('io', io);
+    app.use('/api/orders', orderRoutes(io));
+
+    app.use(errorHandler);
+
+    try {
+      await sequelize.authenticate();
+      console.log('Database connected');
+      await sequelize.sync({ force: false, alter: false });
+      console.log('Database synced');
+
+      // Seed admin user if not exists
+      const { default: User } = await import('./models/User.js');
+      const adminExists = await User.findOne({ where: { email: 'admin@alshatibi.com' } });
+      if (!adminExists) {
+        await User.create({
+          name: 'مدير النظام',
+          email: 'admin@alshatibi.com',
+          password: '123456',
+          phone: '0100000000',
+          role: 'admin',
+        });
+        console.log('Admin user created');
+      }
+
+      modulesLoaded = true;
+    } catch (dbErr) {
+      dbError = dbErr.message;
+      console.error('DB init error:', dbErr.message);
+    }
   } catch (err) {
-    console.error('❌ DB connection error:', err);
-    // إذا فشل الاتصال بقاعدة البيانات الخارجية، لا نريد تشغيل السيرفر ببيانات محلية مؤقتة
-    process.exit(1);
+    dbError = err.message;
+    console.error('Module loading error:', err.message);
   }
-};
-
-startServer();
+}, 100);

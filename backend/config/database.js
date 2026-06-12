@@ -1,8 +1,10 @@
 import { Sequelize } from 'sequelize';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const isProduction = process.env.NODE_ENV === 'production';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const sequelize = isProduction
+const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
       logging: false,
@@ -21,7 +23,7 @@ const sequelize = isProduction
     })
   : new Sequelize({
       dialect: 'sqlite',
-      storage: './database.sqlite',
+      storage: path.join(__dirname, '..', 'database.sqlite'),
       logging: false,
     });
 
